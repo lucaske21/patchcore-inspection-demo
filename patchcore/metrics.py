@@ -3,9 +3,28 @@ from sklearn.metrics import roc_auc_score
 from skimage.measure import label
 
 def compute_auroc(y_true, y_score):
+    '''
+    Compute the Area Under the Receiver Operating Characteristic Curve (AUROC).
+    Args:
+        y_true (np.ndarray): Ground truth binary labels.
+        y_score (np.ndarray): Predicted scores. 
+    Returns:
+        float: The AUROC score.
+    '''
     return roc_auc_score(y_true, y_score)
 
 def compute_max_f1(y_true, y_score, num_thresholds=200):
+    '''
+    Compute the maximum F1 score for a set of predictions and ground truth labels.
+
+    Args:
+        y_true (np.ndarray): Ground truth labels.
+        y_score (np.ndarray): Predicted scores.
+        num_thresholds (int): Number of thresholds to evaluate.
+
+    Returns:
+        tuple: The maximum F1 score and the corresponding threshold.
+    '''
     thresholds = np.linspace(y_score.min(), y_score.max(), num_thresholds)
     best_f1, best_t = 0.0, thresholds[0]
     for t in thresholds:
@@ -21,6 +40,18 @@ def compute_max_f1(y_true, y_score, num_thresholds=200):
     return best_f1, best_t
 
 def compute_pro(anomaly_maps, gt_masks, num_thresholds=200, fpr_max=0.3):
+    '''
+    Compute the Per-Region Overlap (PRO) metric for anomaly detection.
+
+    Args:
+        anomaly_maps (list of np.ndarray): List of anomaly maps.
+        gt_masks (list of np.ndarray): List of ground truth masks.
+        num_thresholds (int): Number of thresholds to evaluate.
+        fpr_max (float): Maximum false positive rate for PRO calculation.
+
+    Returns:
+        float: The PRO score.
+    '''
     thresholds = np.linspace(
         min([m.min() for m in anomaly_maps]),
         max([m.max() for m in anomaly_maps]),
