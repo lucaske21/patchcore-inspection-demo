@@ -4,6 +4,7 @@ tqdm
 numpy
 opencv-python
 scikit-learn
+scikit-image
 pyyaml
 pandas
 pyarrow
