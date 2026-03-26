@@ -1,8 +1,14 @@
 import os
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import numpy as np
 import torch
 import cv2
 from torch.utils.data import DataLoader
+try:
+    from tqdm import tqdm
+except ImportError:
+    tqdm = None
 from patchcore.dataset import MVTecDataset
 from patchcore.backbone import get_backbone
 from patchcore.model import extract_features
@@ -12,21 +18,33 @@ from patchcore.visualization import save_anomaly_visuals
 from patchcore.utils import load_config, ensure_dir
 
 def main(cfg_path):
+    # Step 1: Load evaluation configuration.
+    print(f"[Eval] Loading config: {cfg_path}")
     cfg = load_config(cfg_path)
 
+    # Step 2: Build test dataset and dataloader.
+    print("[Eval] Preparing test dataset...")
     dataset = MVTecDataset(
         root=cfg["data"]["root"],
         category=cfg["data"]["category"],
         split="test",
-        img_size=cfg["data"]["img_size"]
+        img_size=cfg["data"]["img_size"],
+        train_parquet=cfg["data"].get("train_parquet"),
+        test_parquet=cfg["data"].get("test_parquet")
     )
     loader = DataLoader(dataset, batch_size=cfg["data"]["batch_size"], shuffle=False, num_workers=cfg["data"]["num_workers"])
+    print(f"[Eval] Dataset ready: {len(dataset)} samples in {len(loader)} batches")
 
+    # Step 3: Initialize feature extractor backbone.
+    print(f"[Eval] Loading backbone: {cfg['model']['backbone']}")
     backbone = get_backbone(cfg["model"]["backbone"]).to(cfg["device"])
     backbone.eval()
 
+    # Step 4: Load trained memory bank for nearest-neighbor scoring.
+    print("[Eval] Loading memory bank...")
     mb = MemoryBank(cfg["model"]["projection_dim"], random_state=cfg["seed"])
     mb.load(os.path.join(cfg["train"]["save_dir"], cfg["data"]["category"], "memorybank.pkl"))
+    print("[Eval] Memory bank loaded")
 
     image_scores, image_labels = [], []
     pixel_scores_all, pixel_labels_all = [], []
@@ -34,9 +52,18 @@ def main(cfg_path):
 
     save_dir = os.path.join(cfg["eval"]["save_dir"], cfg["data"]["category"], "visuals")
     if cfg["eval"]["save_anomaly_maps"]:
+        # Optional: Create output directory for anomaly visualizations.
         ensure_dir(save_dir)
+        print(f"[Eval] Saving anomaly visuals to: {save_dir}")
 
-    for imgs, labels, masks, paths in loader:
+    # Step 5: Run inference on each test batch and accumulate scores.
+    print("[Eval] Running inference...")
+    iterator = loader
+    if tqdm is not None:
+        # tqdm gives a live progress bar when installed.
+        iterator = tqdm(loader, total=len(loader), desc="Eval batches", unit="batch")
+
+    for batch_idx, (imgs, labels, masks, paths) in enumerate(iterator, start=1):
         imgs = imgs.to(cfg["device"])
         feat = extract_features(backbone, imgs, cfg["model"]["layers"])  # B,C,H,W
         B, C, H, W = feat.shape
@@ -61,6 +88,12 @@ def main(cfg_path):
                 save_path = os.path.join(save_dir, base + ".png")
                 save_anomaly_visuals(imgs[i].cpu(), amap_resized, save_path, alpha=cfg["eval"]["overlay_alpha"])
 
+            if tqdm is None:
+                # Fallback progress message if tqdm is unavailable.
+                print(f"[Eval] Batch {batch_idx}/{len(loader)} processed")
+
+            # Step 6: Compute image-level and pixel-level evaluation metrics.
+            print("[Eval] Computing metrics...")
     image_scores = np.array(image_scores)
     image_labels = np.array(image_labels)
     pixel_scores_all = np.concatenate(pixel_scores_all)
@@ -77,6 +110,8 @@ def main(cfg_path):
     print(f"[Image F1] {img_f1:.4f} @ threshold {img_t:.6f}")
     print(f"[Pixel F1] {pix_f1:.4f} @ threshold {pix_t:.6f}")
     print(f"[PRO] {pro:.4f}")
+    # Step 7: Finalize evaluation.
+    print("[Eval] Done")
 
 if __name__ == "__main__":
     import sys
