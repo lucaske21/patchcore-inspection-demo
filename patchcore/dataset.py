@@ -1,6 +1,7 @@
 import os
 import io
 import base64
+import glob
 from PIL import Image
 from torch.utils.data import Dataset
 import torchvision.transforms as T
@@ -53,9 +54,12 @@ class MVTecDataset(Dataset):
         return samples
 
     def _load_from_parquet(self, parquet_path):
-        if not os.path.exists(parquet_path):
-            raise FileNotFoundError(f"parquet file not found: {parquet_path}")
-        df = pd.read_parquet(parquet_path)
+        parquet_files = self._resolve_parquet_files(parquet_path)
+        if not parquet_files:
+            raise FileNotFoundError(f"no parquet files found from: {parquet_path}")
+
+        frames = [pd.read_parquet(p) for p in parquet_files]
+        df = pd.concat(frames, ignore_index=True) if len(frames) > 1 else frames[0]
 
         image_col = self._pick_col(df.columns, ["image", "img", "input", "pixel_values"])
         if image_col is None:
@@ -78,6 +82,19 @@ class MVTecDataset(Dataset):
             sample_path = str(row[path_col]) if path_col is not None else f"{self.category}_{self.split}_{idx}"
             samples.append((raw_image, label, raw_mask, True, sample_path))
         return samples
+
+    @staticmethod
+    def _resolve_parquet_files(parquet_path):
+        # Support single parquet path, list of parquet paths, or glob pattern.
+        if isinstance(parquet_path, (list, tuple)):
+            files = [str(p) for p in parquet_path]
+        elif isinstance(parquet_path, str) and any(ch in parquet_path for ch in ["*", "?", "["]):
+            files = sorted(glob.glob(parquet_path))
+        else:
+            files = [str(parquet_path)]
+
+        files = [p for p in files if os.path.exists(p)]
+        return sorted(files)
 
     @staticmethod
     def _pick_col(columns, candidates):
