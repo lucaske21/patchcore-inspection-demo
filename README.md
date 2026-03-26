@@ -1,5 +1,9 @@
 # PatchCore MVTec AD (Single-GPU)
 
+## Introduction
+本项目是一个基于 PatchCore 的 MVTec AD 异常检测简化实现，使用 PyTorch 单卡训练，并通过 YAML 配置进行参数管理。项目支持 MemoryBank 构建、异常分数计算、图像级/像素级 AUROC、PRO、F1 等指标评估，并提供异常热图可视化输出，便于快速复现实验与进行工程化验证。适合学习 PatchCore 原理、快速基线实验与异常检测原型开发。
+
+
 ## 1. 安装
 ```bash
 pip install -r requirements.txt
