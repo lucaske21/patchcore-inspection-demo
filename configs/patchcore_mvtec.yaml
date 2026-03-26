@@ -1,0 +1,29 @@
+device: "cuda"
+seed: 42
+
+data:
+  root: "data/mvtec_ad"
+  category: "bottle"
+  img_size: 256
+  batch_size: 4
+  num_workers: 4
+
+model:
+  backbone: "wide_resnet50_2"
+  layers: ["layer2", "layer3"]
+  projection_dim: 256
+
+memorybank:
+  sampling_method: "kcenter"
+  max_samples: 2048
+  knn_k: 5
+
+train:
+  save_dir: "outputs"
+
+eval:
+  save_dir: "outputs"
+  save_anomaly_maps: true
+  overlay_alpha: 0.5
+  num_thresholds: 200
+  pro_fpr_max: 0.3
