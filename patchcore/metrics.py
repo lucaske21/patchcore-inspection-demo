@@ -63,5 +63,9 @@ def compute_pro(anomaly_maps, gt_masks, num_thresholds=200, fpr_max=0.3):
         return 0.0
 
     fprs, pros = fprs[mask], pros[mask]
-    area = np.trapz(pros, fprs) / fpr_max
+    # NumPy 2.x removed np.trapz; keep compatibility with both old and new versions.
+    trapz_fn = getattr(np, "trapz", None)
+    if trapz_fn is None:
+        trapz_fn = np.trapezoid
+    area = trapz_fn(pros, fprs) / fpr_max
     return area
