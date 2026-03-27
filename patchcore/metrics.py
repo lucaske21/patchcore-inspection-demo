@@ -211,6 +211,98 @@ def plot_f1_curve(curves, save_path, title="F1-Confidence Curve"):
     return save_path
 
 
+def compute_roc_curve(y_true, y_score):
+    """Compute ROC curve points.
+
+    Returns
+    -------
+    fprs   : np.ndarray  sorted false-positive rates
+    tprs   : np.ndarray  corresponding true-positive rates
+    auroc  : float
+    """
+    from sklearn.metrics import roc_curve
+    y_true  = np.asarray(y_true,  dtype=float)
+    y_score = np.asarray(y_score, dtype=float)
+    fprs, tprs, _ = roc_curve(y_true, y_score)
+    auroc = float(roc_auc_score(y_true, y_score))
+    return fprs, tprs, auroc
+
+
+def plot_roc_curve(curves, save_path, title="ROC Curve"):
+    """Plot one or more ROC curves in the same dark Ultralytics style.
+
+    Parameters
+    ----------
+    curves : list of dict, each with keys:
+        name   str
+        fprs   ndarray
+        tprs   ndarray
+        auroc  float
+        color  str (optional)
+    save_path : str
+    title     : str
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    BG      = "#111827"
+    GRID    = "#1f2937"
+    palette = ["#00b4d8", "#f72585", "#4cc9f0", "#ff9f1c", "#06d6a0"]
+
+    fig, ax = plt.subplots(figsize=(8, 7))
+    fig.patch.set_facecolor(BG)
+    ax.set_facecolor(BG)
+
+    # ── Grid & diagonal ────────────────────────────────────────────
+    ax.set_xlim(0.0, 1.0)
+    ax.set_ylim(0.0, 1.05)
+    ax.grid(color=GRID, linewidth=0.8, zorder=0)
+    ax.plot([0, 1], [0, 1], linestyle="--", color="#6b7280",
+            linewidth=1.2, label="Random (AUC=0.50)", zorder=1)
+    for spine in ax.spines.values():
+        spine.set_edgecolor("#374151")
+
+    # ── Plot each curve ────────────────────────────────────────────
+    for i, c in enumerate(curves):
+        color = c.get("color", palette[i % len(palette)])
+        fprs  = np.asarray(c["fprs"],  dtype=float)
+        tprs  = np.asarray(c["tprs"],  dtype=float)
+        auroc = float(c["auroc"])
+
+        ax.plot(fprs, tprs, color=color, linewidth=2.5, zorder=3,
+                label=f"{c['name']}  (AUC={auroc:.4f})")
+
+        # Mark the point closest to the ideal corner (0,1)
+        dist  = np.hypot(fprs, 1.0 - tprs)
+        best  = int(np.argmin(dist))
+        ax.plot(fprs[best], tprs[best], "o", color=color, markersize=7, zorder=4)
+        ax.annotate(
+            f"  ({fprs[best]:.3f}, {tprs[best]:.3f})",
+            xy=(fprs[best], tprs[best]),
+            xytext=(fprs[best] + 0.04, tprs[best] - 0.06),
+            color=color, fontsize=8.5,
+            arrowprops=dict(arrowstyle="-", color=color, lw=0.8),
+        )
+
+    # ── Axes styling ───────────────────────────────────────────────
+    ax.set_xlabel("False Positive Rate", color="white", fontsize=11, labelpad=8)
+    ax.set_ylabel("True Positive Rate",  color="white", fontsize=11, labelpad=8)
+    ax.tick_params(colors="white", labelsize=9)
+    ax.set_title(title, color="white", fontsize=13, fontweight="bold", pad=14)
+
+    ax.legend(
+        loc="lower right", fontsize=9,
+        facecolor="#1f2937", edgecolor="#4b5563", labelcolor="white",
+    )
+
+    os.makedirs(os.path.dirname(os.path.abspath(save_path)), exist_ok=True)
+    plt.tight_layout()
+    fig.savefig(save_path, dpi=150, bbox_inches="tight", facecolor=BG)
+    plt.close(fig)
+    return save_path
+
+
 def compute_confusion_matrix(y_true, y_pred):
     """Return a 2x2 confusion matrix [[TN, FP], [FN, TP]] for binary labels."""
     y_true = np.asarray(y_true, dtype=int)

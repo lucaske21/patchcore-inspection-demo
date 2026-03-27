@@ -15,6 +15,7 @@ from patchcore.model import extract_features
 from patchcore.memorybank import MemoryBank
 from patchcore.metrics import (
     compute_auroc, compute_max_f1, compute_pro,
+    compute_roc_curve, plot_roc_curve,
     compute_f1_curve, plot_f1_curve,
     compute_confusion_matrix, plot_confusion_matrix,
 )
@@ -103,8 +104,9 @@ def main(cfg_path):
     pixel_scores_all = np.concatenate(pixel_scores_all)
     pixel_labels_all = np.concatenate(pixel_labels_all)
 
-    img_auroc = compute_auroc(image_labels, image_scores)
-    pix_auroc = compute_auroc(pixel_labels_all, pixel_scores_all)
+    # Compute ROC curves (full FPR/TPR arrays) alongside scalar AUROC.
+    img_fprs, img_tprs, img_auroc = compute_roc_curve(image_labels, image_scores)
+    pix_fprs, pix_tprs, pix_auroc = compute_roc_curve(pixel_labels_all, pixel_scores_all)
     # compute_f1_curve returns full curve data; best_f1/best_t are re-used below.
     img_thresholds, img_f1_vals, img_f1, img_t = compute_f1_curve(
         image_labels, image_scores, cfg["eval"]["num_thresholds"]
@@ -120,7 +122,23 @@ def main(cfg_path):
     print(f"[Pixel F1] {pix_f1:.4f} @ threshold {pix_t:.6f}")
     print(f"[PRO] {pro:.4f}")
 
-    # Step 7: Plot and save F1-confidence curves (image-level + pixel-level).
+    # Step 7: Plot and save ROC curves (image-level + pixel-level).
+    print("[Eval] Generating ROC curve...")
+    roc_save_dir = os.path.join(cfg["eval"]["save_dir"], cfg["data"]["category"])
+    roc_path = os.path.join(roc_save_dir, "roc_curve.png")
+    plot_roc_curve(
+        curves=[
+            {"name": "Image-level", "fprs": img_fprs, "tprs": img_tprs,
+             "auroc": img_auroc, "color": "#00b4d8"},
+            {"name": "Pixel-level", "fprs": pix_fprs, "tprs": pix_tprs,
+             "auroc": pix_auroc, "color": "#f72585"},
+        ],
+        save_path=roc_path,
+        title=f"ROC Curve — {cfg['data']['category']}",
+    )
+    print(f"[Eval] ROC curve saved: {roc_path}")
+
+    # Step 8: Plot and save F1-confidence curves (image-level + pixel-level).
     print("[Eval] Generating F1 curve...")
     f1_save_dir = os.path.join(cfg["eval"]["save_dir"], cfg["data"]["category"])
     f1_path = os.path.join(f1_save_dir, "f1_curve.png")
@@ -138,7 +156,7 @@ def main(cfg_path):
     )
     print(f"[Eval] F1 curve saved: {f1_path}")
 
-    # Step 8: Compute and save confusion matrix at the optimal image-level threshold.
+    # Step 9: Compute and save confusion matrix at the optimal image-level threshold.
     print("[Eval] Generating confusion matrix...")
     img_preds = (image_scores >= img_t).astype(int)
     cm = compute_confusion_matrix(image_labels, img_preds)
@@ -166,7 +184,7 @@ def main(cfg_path):
     )
     print(f"[Eval] Confusion matrix saved: {cm_path}")
 
-    # Step 9: Finalize evaluation.
+    # Step 10: Finalize evaluation.
     print("[Eval] Done")
 
 if __name__ == "__main__":
