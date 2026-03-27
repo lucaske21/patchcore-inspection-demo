@@ -21,6 +21,7 @@ from patchcore.metrics import (
 )
 from patchcore.visualization import save_anomaly_visuals
 from patchcore.utils import load_config, ensure_dir
+from patchcore.eval_report_generator import EvalConfig, EvalReportGenerator
 
 def main(cfg_path):
     # Step 1: Load evaluation configuration.
@@ -184,7 +185,67 @@ def main(cfg_path):
     )
     print(f"[Eval] Confusion matrix saved: {cm_path}")
 
-    # Step 10: Finalize evaluation.
+    # Step 10: Generate comprehensive evaluation report using EvalReportGenerator.
+    print("[Eval] Generating evaluation report...")
+    
+    # Convert lists to 3D numpy arrays for report generator
+    anomaly_maps_3d = np.stack(anomaly_maps, axis=0)  # (N, H, W)
+    gt_masks_3d = np.stack(gt_masks, axis=0)  # (N, H, W)
+    
+    # Reconstruct pixel-level arrays to 3D for compatibility with report generator
+    # pixel_scores and pixel_masks should be (N, H, W) where N is number of images
+    n_images = len(anomaly_maps)
+    img_height, img_width = anomaly_maps[0].shape
+    pixel_scores_3d = np.zeros((n_images, img_height, img_width), dtype=np.float32)
+    pixel_masks_3d = np.zeros((n_images, img_height, img_width), dtype=np.uint8)
+    
+    for idx in range(n_images):
+        pixel_scores_3d[idx] = anomaly_maps[idx]
+        pixel_masks_3d[idx] = gt_masks[idx]
+    
+    # Create evaluation config from patchcore configuration
+    report_cfg = EvalConfig.from_patchcore_dict(
+        cfg, 
+        cfg_path=cfg_path,
+        output_override=os.path.join(cfg["eval"]["save_dir"], cfg["data"]["category"])
+    )
+    
+    # Instantiate report generator
+    report_gen = EvalReportGenerator(report_cfg)
+    
+    # Set input data
+    report_gen.set_inputs(
+        image_scores=image_scores,
+        image_labels=image_labels,
+        pixel_scores=pixel_scores_3d,
+        pixel_masks=pixel_masks_3d,
+    )
+    
+    # Compute all metrics
+    metrics = report_gen.compute_metrics()
+    print(f"[Eval] Metrics computed. Report ID: {report_gen.report_id}")
+    
+    # Generate plots (ROC, F1, Confusion Matrix)
+    plots = report_gen.generate_plots()
+    print(f"[Eval] Plots generated:")
+    print(f"  - ROC curve: {plots['roc_curve']}")
+    print(f"  - F1 curve: {plots['f1_curve']}")
+    print(f"  - Confusion matrix: {plots['confusion_matrix']}")
+    
+    # Generate dual-language PDFs
+    report_gen.generate_pdf_cn(plots=plots)
+    cn_pdf = os.path.join(report_gen.reports_dir, f"{report_gen.report_id}_cn.pdf")
+    print(f"[Eval] Chinese PDF report: {cn_pdf}")
+    
+    report_gen.generate_pdf_en(plots=plots)
+    en_pdf = os.path.join(report_gen.reports_dir, f"{report_gen.report_id}_en.pdf")
+    print(f"[Eval] English PDF report: {en_pdf}")
+    
+    # Save metrics to JSON
+    metrics_json = report_gen.save_metrics_json()
+    print(f"[Eval] Metrics JSON: {metrics_json}")
+
+    # Step 11: Finalize evaluation.
     print("[Eval] Done")
 
 if __name__ == "__main__":
