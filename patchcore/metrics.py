@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from sklearn.metrics import roc_auc_score
 from skimage.measure import label
@@ -100,3 +101,101 @@ def compute_pro(anomaly_maps, gt_masks, num_thresholds=200, fpr_max=0.3):
         trapz_fn = np.trapezoid
     area = trapz_fn(pros, fprs) / fpr_max
     return area
+
+
+def compute_confusion_matrix(y_true, y_pred):
+    """Return a 2x2 confusion matrix [[TN, FP], [FN, TP]] for binary labels."""
+    y_true = np.asarray(y_true, dtype=int)
+    y_pred = np.asarray(y_pred, dtype=int)
+    cm = np.zeros((2, 2), dtype=int)
+    for t, p in zip(y_true, y_pred):
+        cm[t][p] += 1
+    return cm
+
+
+def plot_confusion_matrix(cm, save_path, title="Confusion Matrix", metrics=None):
+    """
+    Plot and save a confusion matrix image in Ultralytics style.
+
+    Parameters
+    ----------
+    cm      : np.ndarray shape (2,2)  [[TN, FP], [FN, TP]]
+    save_path : str
+    title   : str
+    metrics : dict  e.g. {"Precision": 0.95, "Recall": 0.93, ...}
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    class_names = ["Normal", "Anomaly"]
+    n = len(class_names)
+
+    # Row-normalize so each row sums to 1 (recall-perspective).
+    row_sums = cm.sum(axis=1, keepdims=True).astype(float)
+    cm_norm = np.where(row_sums > 0, cm / row_sums, 0.0)
+
+    # ── Figure layout ──────────────────────────────────────────────
+    fig_h = 7.5 if not metrics else 9.0
+    fig, ax = plt.subplots(figsize=(8, fig_h))
+    BG = "#111827"
+    fig.patch.set_facecolor(BG)
+    ax.set_facecolor(BG)
+
+    # ── Heatmap ────────────────────────────────────────────────────
+    cmap = plt.cm.Blues
+    im = ax.imshow(cm_norm, interpolation="nearest", cmap=cmap, vmin=0.0, vmax=1.0)
+
+    # Colorbar
+    cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    cbar.set_ticks([0, 0.25, 0.5, 0.75, 1.0])
+    cbar.ax.tick_params(colors="white", labelsize=9)
+    cbar.ax.set_ylabel("Normalized", color="white", fontsize=9, rotation=270, labelpad=14)
+
+    # ── Cell annotations ───────────────────────────────────────────
+    for i in range(n):
+        for j in range(n):
+            norm_val = cm_norm[i, j]
+            count = cm[i, j]
+            text_color = "#111827" if norm_val > 0.5 else "white"
+            ax.text(j, i, f"{count}\n{norm_val:.1%}",
+                    ha="center", va="center",
+                    fontsize=15, fontweight="bold", color=text_color)
+
+    # ── Grid lines ─────────────────────────────────────────────────
+    for v in np.arange(-0.5, n, 1):
+        ax.axhline(v, color="#374151", linewidth=1.0)
+        ax.axvline(v, color="#374151", linewidth=1.0)
+
+    # ── Axes labels & title ────────────────────────────────────────
+    ax.set_xticks(range(n))
+    ax.set_yticks(range(n))
+    ax.set_xticklabels(class_names, color="white", fontsize=13)
+    ax.set_yticklabels(class_names, color="white", fontsize=13)
+    ax.tick_params(colors="white")
+    ax.set_xlabel("Predicted Label", color="white", fontsize=12, labelpad=10)
+    ax.set_ylabel("True Label", color="white", fontsize=12, labelpad=10)
+    ax.set_title(title, color="white", fontsize=14, fontweight="bold", pad=16)
+
+    # ── Metrics footer ─────────────────────────────────────────────
+    if metrics:
+        lines = [
+            f"{k}: {v:.4f}" if isinstance(v, float) else f"{k}: {v}"
+            for k, v in metrics.items()
+        ]
+        # 4 items per row
+        rows = ["   ".join(lines[i:i + 4]) for i in range(0, len(lines), 4)]
+        footer = "\n".join(rows)
+        fig.text(
+            0.5, 0.01, footer,
+            ha="center", va="bottom",
+            color="#d1d5db", fontsize=10,
+            bbox=dict(boxstyle="round,pad=0.5", facecolor="#1f2937",
+                      edgecolor="#4b5563", alpha=0.9)
+        )
+
+    os.makedirs(os.path.dirname(os.path.abspath(save_path)), exist_ok=True)
+    plt.tight_layout(rect=[0, 0.08 if metrics else 0, 1, 1])
+    fig.savefig(save_path, dpi=150, bbox_inches="tight", facecolor=BG)
+    plt.close(fig)
+    return save_path

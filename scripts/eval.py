@@ -13,7 +13,10 @@ from patchcore.dataset import MVTecDataset
 from patchcore.backbone import get_backbone
 from patchcore.model import extract_features
 from patchcore.memorybank import MemoryBank
-from patchcore.metrics import compute_auroc, compute_max_f1, compute_pro
+from patchcore.metrics import (
+    compute_auroc, compute_max_f1, compute_pro,
+    compute_confusion_matrix, plot_confusion_matrix,
+)
 from patchcore.visualization import save_anomaly_visuals
 from patchcore.utils import load_config, ensure_dir
 
@@ -92,8 +95,8 @@ def main(cfg_path):
                 # Fallback progress message if tqdm is unavailable.
                 print(f"[Eval] Batch {batch_idx}/{len(loader)} processed")
 
-            # Step 6: Compute image-level and pixel-level evaluation metrics.
-            print("[Eval] Computing metrics...")
+    # Step 6: Compute image-level and pixel-level evaluation metrics.
+    print("[Eval] Computing metrics...")
     image_scores = np.array(image_scores)
     image_labels = np.array(image_labels)
     pixel_scores_all = np.concatenate(pixel_scores_all)
@@ -110,7 +113,36 @@ def main(cfg_path):
     print(f"[Image F1] {img_f1:.4f} @ threshold {img_t:.6f}")
     print(f"[Pixel F1] {pix_f1:.4f} @ threshold {pix_t:.6f}")
     print(f"[PRO] {pro:.4f}")
-    # Step 7: Finalize evaluation.
+
+    # Step 7: Compute and save confusion matrix at the optimal image-level threshold.
+    print("[Eval] Generating confusion matrix...")
+    img_preds = (image_scores >= img_t).astype(int)
+    cm = compute_confusion_matrix(image_labels, img_preds)
+    tn, fp, fn, tp = cm[0, 0], cm[0, 1], cm[1, 0], cm[1, 1]
+    precision = tp / (tp + fp + 1e-8)
+    recall    = tp / (tp + fn + 1e-8)
+    accuracy  = (tp + tn) / (cm.sum() + 1e-8)
+    specificity = tn / (tn + fp + 1e-8)
+    cm_metrics = {
+        "Accuracy":    float(accuracy),
+        "Precision":   float(precision),
+        "Recall":      float(recall),
+        "Specificity": float(specificity),
+        "F1":          float(img_f1),
+        "Image AUROC": float(img_auroc),
+        "Pixel AUROC": float(pix_auroc),
+        "PRO":         float(pro),
+    }
+    cm_save_dir = os.path.join(cfg["eval"]["save_dir"], cfg["data"]["category"])
+    cm_path = os.path.join(cm_save_dir, "confusion_matrix.png")
+    plot_confusion_matrix(
+        cm, cm_path,
+        title=f"Confusion Matrix — {cfg['data']['category']}",
+        metrics=cm_metrics,
+    )
+    print(f"[Eval] Confusion matrix saved: {cm_path}")
+
+    # Step 8: Finalize evaluation.
     print("[Eval] Done")
 
 if __name__ == "__main__":
