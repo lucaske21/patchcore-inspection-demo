@@ -130,7 +130,7 @@ def compute_f1_curve(y_true, y_score, num_thresholds=200):
 
 
 def plot_f1_curve(curves, save_path, title="F1-Confidence Curve"):
-    """Plot one or more F1-vs-threshold curves in Ultralytics style.
+    """Plot one or more F1-vs-threshold curves in academic/professional style.
 
     Parameters
     ----------
@@ -148,22 +148,24 @@ def plot_f1_curve(curves, save_path, title="F1-Confidence Curve"):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    BG   = "#111827"
-    GRID = "#1f2937"
-    palette = ["#00b4d8", "#f72585", "#4cc9f0", "#ff9f1c", "#06d6a0"]
+    BG      = "white"
+    GRID    = "#e0e0e0"
+    palette = ["#0072b2", "#d55e00", "#009e73", "#cc79a7", "#f0e442"]
 
     fig, ax = plt.subplots(figsize=(9, 6))
     fig.patch.set_facecolor(BG)
     ax.set_facecolor(BG)
 
-    # ── Grid ──────────────────────────────────────────────────────
+    # Grid
     ax.set_xlim(0.0, 1.0)
     ax.set_ylim(0.0, 1.05)
-    ax.grid(color=GRID, linewidth=0.8, zorder=0)
+    ax.grid(color=GRID, linewidth=0.6, zorder=0, linestyle="-", alpha=0.5)
+    ax.set_axisbelow(True)
     for spine in ax.spines.values():
-        spine.set_edgecolor("#374151")
+        spine.set_edgecolor("#808080")
+        spine.set_linewidth(0.8)
 
-    # ── Plot each curve ───────────────────────────────────────────
+    # Plot each curve
     for i, c in enumerate(curves):
         color = c.get("color", palette[i % len(palette)])
         thresholds = np.asarray(c["thresholds"], dtype=float)
@@ -171,19 +173,19 @@ def plot_f1_curve(curves, save_path, title="F1-Confidence Curve"):
         best_f1    = float(c["best_f1"])
         best_t     = float(c["best_t"])
 
-        # Normalise threshold axis to [0, 1] as "confidence" (like Ultralytics)
+        # Normalise threshold axis to [0, 1] as "confidence"
         t_min, t_max = thresholds.min(), thresholds.max()
         span = t_max - t_min if t_max > t_min else 1.0
         conf = (thresholds - t_min) / span
         best_conf = (best_t - t_min) / span
 
-        ax.plot(conf, f1_values, color=color, linewidth=2.0, zorder=3,
+        ax.plot(conf, f1_values, color=color, linewidth=2.2, zorder=3,
                 label=f"{c['name']}  (F1={best_f1:.4f} @ conf={best_conf:.2f})")
 
         # Peak marker
-        ax.plot(best_conf, best_f1, "o", color=color, markersize=7, zorder=4)
+        ax.plot(best_conf, best_f1, "o", color=color, markersize=8, zorder=4)
         # Vertical dashed line at peak
-        ax.axvline(best_conf, color=color, linewidth=0.9, linestyle="--", alpha=0.6, zorder=2)
+        ax.axvline(best_conf, color=color, linewidth=0.8, linestyle="--", alpha=0.5, zorder=2)
         # Annotation box
         ax.annotate(
             f"  F1={best_f1:.4f}",
@@ -193,20 +195,21 @@ def plot_f1_curve(curves, save_path, title="F1-Confidence Curve"):
             arrowprops=dict(arrowstyle="-", color=color, lw=0.8),
         )
 
-    # ── Axes styling ─────────────────────────────────────────────
-    ax.set_xlabel("Confidence (normalised threshold)", color="white", fontsize=11, labelpad=8)
-    ax.set_ylabel("F1 Score", color="white", fontsize=11, labelpad=8)
-    ax.tick_params(colors="white", labelsize=9)
-    ax.set_title(title, color="white", fontsize=13, fontweight="bold", pad=14)
+    # Axes styling
+    ax.set_xlabel("Confidence (normalised threshold)", color="#1a1a1a", fontsize=11, labelpad=8)
+    ax.set_ylabel("F1 Score", color="#1a1a1a", fontsize=11, labelpad=8)
+    ax.tick_params(colors="#1a1a1a", labelsize=9)
+    ax.set_title(title, color="#1a1a1a", fontsize=13, fontweight="bold", pad=14)
 
     legend = ax.legend(
         loc="lower left", fontsize=9,
-        facecolor="#1f2937", edgecolor="#4b5563", labelcolor="white",
+        facecolor="white", edgecolor="#808080", labelcolor="#1a1a1a",
+        framealpha=0.95,
     )
 
     os.makedirs(os.path.dirname(os.path.abspath(save_path)), exist_ok=True)
     plt.tight_layout()
-    fig.savefig(save_path, dpi=150, bbox_inches="tight", facecolor=BG)
+    fig.savefig(save_path, dpi=300, bbox_inches="tight", facecolor=BG)
     plt.close(fig)
     return save_path
 
@@ -229,7 +232,7 @@ def compute_roc_curve(y_true, y_score):
 
 
 def plot_roc_curve(curves, save_path, title="ROC Curve"):
-    """Plot one or more ROC curves in the same dark Ultralytics style.
+    """Plot one or more ROC curves in academic/professional style.
 
     Parameters
     ----------
@@ -246,24 +249,26 @@ def plot_roc_curve(curves, save_path, title="ROC Curve"):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
-    BG      = "#111827"
-    GRID    = "#1f2937"
-    palette = ["#00b4d8", "#f72585", "#4cc9f0", "#ff9f1c", "#06d6a0"]
+    BG      = "white"
+    GRID    = "#e0e0e0"
+    palette = ["#0072b2", "#d55e00", "#009e73", "#cc79a7", "#f0e442"]
 
     fig, ax = plt.subplots(figsize=(8, 7))
     fig.patch.set_facecolor(BG)
     ax.set_facecolor(BG)
 
-    # ── Grid & diagonal ────────────────────────────────────────────
+    # Grid and diagonal reference line
     ax.set_xlim(0.0, 1.0)
     ax.set_ylim(0.0, 1.05)
-    ax.grid(color=GRID, linewidth=0.8, zorder=0)
-    ax.plot([0, 1], [0, 1], linestyle="--", color="#6b7280",
+    ax.grid(color=GRID, linewidth=0.6, zorder=0, linestyle="-", alpha=0.5)
+    ax.set_axisbelow(True)
+    ax.plot([0, 1], [0, 1], linestyle="--", color="#999999",
             linewidth=1.2, label="Random (AUC=0.50)", zorder=1)
     for spine in ax.spines.values():
-        spine.set_edgecolor("#374151")
+        spine.set_edgecolor("#808080")
+        spine.set_linewidth(0.8)
 
-    # ── Plot each curve ────────────────────────────────────────────
+    # Plot each curve
     for i, c in enumerate(curves):
         color = c.get("color", palette[i % len(palette)])
         fprs  = np.asarray(c["fprs"],  dtype=float)
@@ -276,7 +281,7 @@ def plot_roc_curve(curves, save_path, title="ROC Curve"):
         # Mark the point closest to the ideal corner (0,1)
         dist  = np.hypot(fprs, 1.0 - tprs)
         best  = int(np.argmin(dist))
-        ax.plot(fprs[best], tprs[best], "o", color=color, markersize=7, zorder=4)
+        ax.plot(fprs[best], tprs[best], "o", color=color, markersize=8, zorder=4)
         ax.annotate(
             f"  ({fprs[best]:.3f}, {tprs[best]:.3f})",
             xy=(fprs[best], tprs[best]),
@@ -285,20 +290,21 @@ def plot_roc_curve(curves, save_path, title="ROC Curve"):
             arrowprops=dict(arrowstyle="-", color=color, lw=0.8),
         )
 
-    # ── Axes styling ───────────────────────────────────────────────
-    ax.set_xlabel("False Positive Rate", color="white", fontsize=11, labelpad=8)
-    ax.set_ylabel("True Positive Rate",  color="white", fontsize=11, labelpad=8)
-    ax.tick_params(colors="white", labelsize=9)
-    ax.set_title(title, color="white", fontsize=13, fontweight="bold", pad=14)
+    # Axes styling
+    ax.set_xlabel("False Positive Rate", color="#1a1a1a", fontsize=11, labelpad=8)
+    ax.set_ylabel("True Positive Rate",  color="#1a1a1a", fontsize=11, labelpad=8)
+    ax.tick_params(colors="#1a1a1a", labelsize=9)
+    ax.set_title(title, color="#1a1a1a", fontsize=13, fontweight="bold", pad=14)
 
     ax.legend(
         loc="lower right", fontsize=9,
-        facecolor="#1f2937", edgecolor="#4b5563", labelcolor="white",
+        facecolor="white", edgecolor="#808080", labelcolor="#1a1a1a",
+        framealpha=0.95,
     )
 
     os.makedirs(os.path.dirname(os.path.abspath(save_path)), exist_ok=True)
     plt.tight_layout()
-    fig.savefig(save_path, dpi=150, bbox_inches="tight", facecolor=BG)
+    fig.savefig(save_path, dpi=300, bbox_inches="tight", facecolor=BG)
     plt.close(fig)
     return save_path
 
@@ -315,7 +321,7 @@ def compute_confusion_matrix(y_true, y_pred):
 
 def plot_confusion_matrix(cm, save_path, title="Confusion Matrix", metrics=None):
     """
-    Plot and save a confusion matrix image in Ultralytics style.
+    Plot and save a confusion matrix image in academic/professional style.
 
     Parameters
     ----------
@@ -335,49 +341,49 @@ def plot_confusion_matrix(cm, save_path, title="Confusion Matrix", metrics=None)
     row_sums = cm.sum(axis=1, keepdims=True).astype(float)
     cm_norm = np.where(row_sums > 0, cm / row_sums, 0.0)
 
-    # ── Figure layout ──────────────────────────────────────────────
+    # Figure layout
     fig_h = 7.5 if not metrics else 9.0
     fig, ax = plt.subplots(figsize=(8, fig_h))
-    BG = "#111827"
+    BG = "white"
     fig.patch.set_facecolor(BG)
     ax.set_facecolor(BG)
 
-    # ── Heatmap ────────────────────────────────────────────────────
+    # Heatmap
     cmap = plt.cm.Blues
     im = ax.imshow(cm_norm, interpolation="nearest", cmap=cmap, vmin=0.0, vmax=1.0)
 
     # Colorbar
     cbar = plt.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
     cbar.set_ticks([0, 0.25, 0.5, 0.75, 1.0])
-    cbar.ax.tick_params(colors="white", labelsize=9)
-    cbar.ax.set_ylabel("Normalized", color="white", fontsize=9, rotation=270, labelpad=14)
+    cbar.ax.tick_params(colors="#1a1a1a", labelsize=9)
+    cbar.ax.set_ylabel("Normalized", color="#1a1a1a", fontsize=9, rotation=270, labelpad=14)
 
-    # ── Cell annotations ───────────────────────────────────────────
+    # Cell annotations
     for i in range(n):
         for j in range(n):
             norm_val = cm_norm[i, j]
             count = cm[i, j]
-            text_color = "#111827" if norm_val > 0.5 else "white"
+            text_color = "white" if norm_val > 0.5 else "#1a1a1a"
             ax.text(j, i, f"{count}\n{norm_val:.1%}",
                     ha="center", va="center",
                     fontsize=15, fontweight="bold", color=text_color)
 
-    # ── Grid lines ─────────────────────────────────────────────────
+    # Grid lines
     for v in np.arange(-0.5, n, 1):
-        ax.axhline(v, color="#374151", linewidth=1.0)
-        ax.axvline(v, color="#374151", linewidth=1.0)
+        ax.axhline(v, color="#999999", linewidth=1.0)
+        ax.axvline(v, color="#999999", linewidth=1.0)
 
-    # ── Axes labels & title ────────────────────────────────────────
+    # Axes labels and title
     ax.set_xticks(range(n))
     ax.set_yticks(range(n))
-    ax.set_xticklabels(class_names, color="white", fontsize=13)
-    ax.set_yticklabels(class_names, color="white", fontsize=13)
-    ax.tick_params(colors="white")
-    ax.set_xlabel("Predicted Label", color="white", fontsize=12, labelpad=10)
-    ax.set_ylabel("True Label", color="white", fontsize=12, labelpad=10)
-    ax.set_title(title, color="white", fontsize=14, fontweight="bold", pad=16)
+    ax.set_xticklabels(class_names, color="#1a1a1a", fontsize=13)
+    ax.set_yticklabels(class_names, color="#1a1a1a", fontsize=13)
+    ax.tick_params(colors="#1a1a1a")
+    ax.set_xlabel("Predicted Label", color="#1a1a1a", fontsize=12, labelpad=10)
+    ax.set_ylabel("True Label", color="#1a1a1a", fontsize=12, labelpad=10)
+    ax.set_title(title, color="#1a1a1a", fontsize=14, fontweight="bold", pad=16)
 
-    # ── Metrics footer ─────────────────────────────────────────────
+    # Metrics footer
     if metrics:
         lines = [
             f"{k}: {v:.4f}" if isinstance(v, float) else f"{k}: {v}"
@@ -389,13 +395,13 @@ def plot_confusion_matrix(cm, save_path, title="Confusion Matrix", metrics=None)
         fig.text(
             0.5, 0.01, footer,
             ha="center", va="bottom",
-            color="#d1d5db", fontsize=10,
-            bbox=dict(boxstyle="round,pad=0.5", facecolor="#1f2937",
-                      edgecolor="#4b5563", alpha=0.9)
+            color="#333333", fontsize=10,
+            bbox=dict(boxstyle="round,pad=0.5", facecolor="#f0f0f0",
+                      edgecolor="#999999", alpha=0.95)
         )
 
     os.makedirs(os.path.dirname(os.path.abspath(save_path)), exist_ok=True)
     plt.tight_layout(rect=[0, 0.08 if metrics else 0, 1, 1])
-    fig.savefig(save_path, dpi=150, bbox_inches="tight", facecolor=BG)
+    fig.savefig(save_path, dpi=300, bbox_inches="tight", facecolor=BG)
     plt.close(fig)
     return save_path
