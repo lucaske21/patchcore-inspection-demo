@@ -103,6 +103,114 @@ def compute_pro(anomaly_maps, gt_masks, num_thresholds=200, fpr_max=0.3):
     return area
 
 
+def compute_f1_curve(y_true, y_score, num_thresholds=200):
+    """Compute F1 score at each threshold.
+
+    Returns
+    -------
+    thresholds : np.ndarray  shape (N,)  — raw score values
+    f1_values  : np.ndarray  shape (N,)
+    best_f1    : float
+    best_t     : float  — threshold at best_f1
+    """
+    y_true  = np.asarray(y_true, dtype=float)
+    y_score = np.asarray(y_score, dtype=float)
+    thresholds = np.linspace(y_score.min(), y_score.max(), num_thresholds)
+    f1_values = np.zeros(num_thresholds)
+    for k, t in enumerate(thresholds):
+        preds = (y_score >= t).astype(float)
+        tp = (preds * y_true).sum()
+        fp = (preds * (1 - y_true)).sum()
+        fn = ((1 - preds) * y_true).sum()
+        precision = tp / (tp + fp + 1e-8)
+        recall    = tp / (tp + fn + 1e-8)
+        f1_values[k] = 2 * precision * recall / (precision + recall + 1e-8)
+    best_idx = int(np.argmax(f1_values))
+    return thresholds, f1_values, float(f1_values[best_idx]), float(thresholds[best_idx])
+
+
+def plot_f1_curve(curves, save_path, title="F1-Confidence Curve"):
+    """Plot one or more F1-vs-threshold curves in Ultralytics style.
+
+    Parameters
+    ----------
+    curves : list of dict, each with keys:
+        name        str   — legend label
+        thresholds  ndarray
+        f1_values   ndarray
+        best_f1     float
+        best_t      float
+        color       str (optional)  — line colour
+    save_path : str
+    title     : str
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    BG   = "#111827"
+    GRID = "#1f2937"
+    palette = ["#00b4d8", "#f72585", "#4cc9f0", "#ff9f1c", "#06d6a0"]
+
+    fig, ax = plt.subplots(figsize=(9, 6))
+    fig.patch.set_facecolor(BG)
+    ax.set_facecolor(BG)
+
+    # ── Grid ──────────────────────────────────────────────────────
+    ax.set_xlim(0.0, 1.0)
+    ax.set_ylim(0.0, 1.05)
+    ax.grid(color=GRID, linewidth=0.8, zorder=0)
+    for spine in ax.spines.values():
+        spine.set_edgecolor("#374151")
+
+    # ── Plot each curve ───────────────────────────────────────────
+    for i, c in enumerate(curves):
+        color = c.get("color", palette[i % len(palette)])
+        thresholds = np.asarray(c["thresholds"], dtype=float)
+        f1_values  = np.asarray(c["f1_values"],  dtype=float)
+        best_f1    = float(c["best_f1"])
+        best_t     = float(c["best_t"])
+
+        # Normalise threshold axis to [0, 1] as "confidence" (like Ultralytics)
+        t_min, t_max = thresholds.min(), thresholds.max()
+        span = t_max - t_min if t_max > t_min else 1.0
+        conf = (thresholds - t_min) / span
+        best_conf = (best_t - t_min) / span
+
+        ax.plot(conf, f1_values, color=color, linewidth=2.0, zorder=3,
+                label=f"{c['name']}  (F1={best_f1:.4f} @ conf={best_conf:.2f})")
+
+        # Peak marker
+        ax.plot(best_conf, best_f1, "o", color=color, markersize=7, zorder=4)
+        # Vertical dashed line at peak
+        ax.axvline(best_conf, color=color, linewidth=0.9, linestyle="--", alpha=0.6, zorder=2)
+        # Annotation box
+        ax.annotate(
+            f"  F1={best_f1:.4f}",
+            xy=(best_conf, best_f1),
+            xytext=(best_conf + 0.02, best_f1 - 0.06),
+            color=color, fontsize=9,
+            arrowprops=dict(arrowstyle="-", color=color, lw=0.8),
+        )
+
+    # ── Axes styling ─────────────────────────────────────────────
+    ax.set_xlabel("Confidence (normalised threshold)", color="white", fontsize=11, labelpad=8)
+    ax.set_ylabel("F1 Score", color="white", fontsize=11, labelpad=8)
+    ax.tick_params(colors="white", labelsize=9)
+    ax.set_title(title, color="white", fontsize=13, fontweight="bold", pad=14)
+
+    legend = ax.legend(
+        loc="lower left", fontsize=9,
+        facecolor="#1f2937", edgecolor="#4b5563", labelcolor="white",
+    )
+
+    os.makedirs(os.path.dirname(os.path.abspath(save_path)), exist_ok=True)
+    plt.tight_layout()
+    fig.savefig(save_path, dpi=150, bbox_inches="tight", facecolor=BG)
+    plt.close(fig)
+    return save_path
+
+
 def compute_confusion_matrix(y_true, y_pred):
     """Return a 2x2 confusion matrix [[TN, FP], [FN, TP]] for binary labels."""
     y_true = np.asarray(y_true, dtype=int)

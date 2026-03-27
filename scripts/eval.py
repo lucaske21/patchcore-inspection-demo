@@ -15,6 +15,7 @@ from patchcore.model import extract_features
 from patchcore.memorybank import MemoryBank
 from patchcore.metrics import (
     compute_auroc, compute_max_f1, compute_pro,
+    compute_f1_curve, plot_f1_curve,
     compute_confusion_matrix, plot_confusion_matrix,
 )
 from patchcore.visualization import save_anomaly_visuals
@@ -104,8 +105,13 @@ def main(cfg_path):
 
     img_auroc = compute_auroc(image_labels, image_scores)
     pix_auroc = compute_auroc(pixel_labels_all, pixel_scores_all)
-    img_f1, img_t = compute_max_f1(image_labels, image_scores, cfg["eval"]["num_thresholds"])
-    pix_f1, pix_t = compute_max_f1(pixel_labels_all, pixel_scores_all, cfg["eval"]["num_thresholds"])
+    # compute_f1_curve returns full curve data; best_f1/best_t are re-used below.
+    img_thresholds, img_f1_vals, img_f1, img_t = compute_f1_curve(
+        image_labels, image_scores, cfg["eval"]["num_thresholds"]
+    )
+    pix_thresholds, pix_f1_vals, pix_f1, pix_t = compute_f1_curve(
+        pixel_labels_all, pixel_scores_all, cfg["eval"]["num_thresholds"]
+    )
     pro = compute_pro(anomaly_maps, gt_masks, cfg["eval"]["num_thresholds"], cfg["eval"]["pro_fpr_max"])
 
     print(f"[Image AUROC] {img_auroc:.4f}")
@@ -114,7 +120,25 @@ def main(cfg_path):
     print(f"[Pixel F1] {pix_f1:.4f} @ threshold {pix_t:.6f}")
     print(f"[PRO] {pro:.4f}")
 
-    # Step 7: Compute and save confusion matrix at the optimal image-level threshold.
+    # Step 7: Plot and save F1-confidence curves (image-level + pixel-level).
+    print("[Eval] Generating F1 curve...")
+    f1_save_dir = os.path.join(cfg["eval"]["save_dir"], cfg["data"]["category"])
+    f1_path = os.path.join(f1_save_dir, "f1_curve.png")
+    plot_f1_curve(
+        curves=[
+            {"name": "Image-level", "thresholds": img_thresholds,
+             "f1_values": img_f1_vals, "best_f1": img_f1, "best_t": img_t,
+             "color": "#00b4d8"},
+            {"name": "Pixel-level", "thresholds": pix_thresholds,
+             "f1_values": pix_f1_vals, "best_f1": pix_f1, "best_t": pix_t,
+             "color": "#f72585"},
+        ],
+        save_path=f1_path,
+        title=f"F1-Confidence Curve — {cfg['data']['category']}",
+    )
+    print(f"[Eval] F1 curve saved: {f1_path}")
+
+    # Step 8: Compute and save confusion matrix at the optimal image-level threshold.
     print("[Eval] Generating confusion matrix...")
     img_preds = (image_scores >= img_t).astype(int)
     cm = compute_confusion_matrix(image_labels, img_preds)
@@ -142,7 +166,7 @@ def main(cfg_path):
     )
     print(f"[Eval] Confusion matrix saved: {cm_path}")
 
-    # Step 8: Finalize evaluation.
+    # Step 9: Finalize evaluation.
     print("[Eval] Done")
 
 if __name__ == "__main__":
