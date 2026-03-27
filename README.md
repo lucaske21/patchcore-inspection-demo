@@ -35,8 +35,23 @@ python scripts/eval.py configs/patchcore_mvtec.yaml
 - Image F1（max-f1）
 - Pixel F1（max-f1）
 - PRO（FPR<=0.3）
+- ROC 曲线图（自动保存）
 - F1 曲线图（自动保存）
 - 混淆矩阵图（自动保存）
+
+### ROC 曲线
+
+评估结束后自动生成 ROC 曲线图，保存至：
+```
+outputs/<category>/roc_curve.png
+```
+
+图像风格与项目其他图表一致，包含：
+- 深色背景，同时展示 **图像级**（蓝色）与 **像素级**（粉色）两条 ROC 曲线
+- 灰色虚线为随机分类器基准（AUC=0.50）
+- 每条曲线在最近理想角点 (0,1) 处标注坐标
+- 图例显示每条曲线的 AUC 数值
+- X 轴：False Positive Rate；Y 轴：True Positive Rate
 
 ### F1 曲线
 
