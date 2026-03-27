@@ -35,7 +35,21 @@ python scripts/eval.py configs/patchcore_mvtec.yaml
 - Image F1（max-f1）
 - Pixel F1（max-f1）
 - PRO（FPR<=0.3）
-- Confusion Matrix(AUTO SVAING)
+- F1 曲线图（自动保存）
+- 混淆矩阵图（自动保存）
+
+### F1 曲线
+
+评估结束后自动生成 F1-Confidence 曲线图，保存至：
+```
+outputs/<category>/f1_curve.png
+```
+
+图像风格参考 Ultralytics，包含：
+- 深色背景，同时展示 **图像级** 与 **像素级** 两条曲线（蓝色 / 粉色）
+- X 轴为归一化置信度（0→1），Y 轴为 F1 分数
+- 每条曲线在峰值处标注圆点、垂直虚线与 `F1=x.xxxx` 标注框
+- 图例显示每条曲线的最优 F1 及对应置信度
 
 ### 混淆矩阵
 评估结束后自动生成混淆矩阵图，保存至：
