@@ -9,3 +9,4 @@ pyyaml
 pandas
 pyarrow
 matplotlib
+reportlab
