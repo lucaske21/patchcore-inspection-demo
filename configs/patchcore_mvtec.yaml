@@ -4,6 +4,8 @@ seed: 42
 data:
   root: "data/mvtec_ad"
   category: "bottle"
+  train_parquet: "../dataset/mvtec-ad/data/bottle.train-00000-of-00001.parquet"
+  test_parquet: "../dataset/mvtec-ad/data/bottle.test-00000-of-00001.parquet"
   img_size: 256
   batch_size: 4
   num_workers: 4
@@ -24,6 +26,6 @@ train:
 eval:
   save_dir: "outputs"
   save_anomaly_maps: true
-  overlay_alpha: 0.5
+  overlay_alpha: 0.3
   num_thresholds: 200
   pro_fpr_max: 0.3
